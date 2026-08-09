@@ -1,0 +1,25 @@
+version: "3.9"
+
+services:
+  tracex:
+    build: .
+    image: tracex:latest
+    container_name: tracex
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # ВАЖНО: задайте свой длинный случайный ключ в проде (иначе сессии
+      # будут сбрасываться при каждом перезапуске контейнера).
+      # Сгенерировать: python3 -c "import secrets; print(secrets.token_hex(32))"
+      - SECRET_KEY=change-me-to-a-long-random-string
+      # Логин/пароль администратора, который будет создан при первом запуске.
+      # Если не задать ADMIN_PASSWORD — пароль будет сгенерирован
+      # автоматически и выведен в логи контейнера один раз при старте.
+      - ADMIN_USERNAME=admin
+      - ADMIN_PASSWORD=change-me-please
+    volumes:
+      - tracex_data:/app/data
+
+volumes:
+  tracex_data:

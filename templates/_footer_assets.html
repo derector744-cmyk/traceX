@@ -1,0 +1,4 @@
+{% if flash %}
+<script id="tx-flash-data" type="application/json">{{ flash | tojson }}</script>
+{% endif %}
+<script src="/static/js/tracex.js"></script>
