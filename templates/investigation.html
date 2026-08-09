@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ inv.title }} — {{ app_name }}</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+<script>
+  tailwind.config = {
+    theme: { extend: { colors: {
+      obsidian: { bg:'#1e1e1e', panel:'#262626', panel2:'#2d2d2d', border:'#3a3a3a', accent:'#8875ff', accent2:'#a78bfa', text:'#dcddde', muted:'#9a9a9a' }
+    }}}
+  }
+</script>
+<style>
+  body { background-color: #1e1e1e; }
+  #local-network { background-color: #1e1e1e; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: #3a3a3a; border-radius: 4px; }
+  .vis-tooltip {
+    background-color: #262626 !important; color: #dcddde !important;
+    border: 1px solid #3a3a3a !important; border-radius: 8px !important;
+    padding: 8px 10px !important; white-space: pre-line !important;
+  }
+  .timeline-item::before {
+    content: ''; position: absolute; left: -5px; top: 4px;
+    width: 10px; height: 10px; border-radius: 9999px;
+    background: #8875ff; border: 2px solid #1e1e1e;
+  }
+</style>
+</head>
+<body class="bg-obsidian-bg text-obsidian-text min-h-screen flex flex-col">
+
+  <header class="border-b border-obsidian-border bg-obsidian-panel sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+      <a href="/" class="text-2xl font-bold tracking-tight text-obsidian-accent">trace<span class="text-white">X</span></a>
+      <a href="/" class="text-sm text-obsidian-muted hover:text-white transition">← Ко всем расследованиям</a>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-7xl mx-auto w-full px-4 py-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+    <!-- LEFT / MAIN COLUMN -->
+    <div class="lg:col-span-2 space-y-6">
+
+      <section class="bg-obsidian-panel border border-obsidian-border rounded-xl p-5">
+        <div class="flex items-start justify-between gap-3 flex-wrap mb-2">
+          <h1 class="text-2xl font-bold text-white">{{ inv.title }}</h1>
+          <span class="shrink-0 text-xs px-2.5 py-1 rounded-full border
+            {% if inv.status == 'completed' %} border-green-600 text-green-400
+            {% elif inv.status == 'factcheck' %} border-yellow-600 text-yellow-400
+            {% else %} border-blue-600 text-blue-400 {% endif %}">
+            {{ inv.status_label }}
+          </span>
+        </div>
+        <div class="flex flex-wrap items-center gap-2 text-xs text-obsidian-muted mb-4">
+          <span class="px-2 py-0.5 rounded bg-obsidian-panel2 border border-obsidian-border">{{ inv.category }}</span>
+          <span>Автор: {{ inv.author }}</span>
+          <span>·</span>
+          <span>{{ inv.created_at.strftime('%d.%m.%Y %H:%M') }}</span>
+        </div>
+        <p class="text-obsidian-text whitespace-pre-line leading-relaxed">{{ inv.description or "Описание отсутствует." }}</p>
+      </section>
+
+      <!-- TIMELINE -->
+      <section class="bg-obsidian-panel border border-obsidian-border rounded-xl p-5">
+        <h2 class="text-lg font-semibold text-white mb-4">🕒 Таймлайн событий</h2>
+        {% if inv.timeline_events %}
+        <div class="relative pl-5 border-l-2 border-obsidian-border space-y-5">
+          {% for event in inv.timeline_events %}
+          <div class="timeline-item relative">
+            <div class="text-xs text-obsidian-accent2 font-mono mb-0.5">{{ event.event_date }}</div>
+            <div class="font-medium text-white">{{ event.title }}</div>
+            {% if event.description %}
+            <div class="text-sm text-obsidian-muted mt-0.5">{{ event.description }}</div>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-sm text-obsidian-muted">Таймлайн пока пуст.</p>
+        {% endif %}
+      </section>
+
+      <!-- EVIDENCE -->
+      <section id="evidence" class="bg-obsidian-panel border border-obsidian-border rounded-xl p-5">
+        <h2 class="text-lg font-semibold text-white mb-4">📎 Улики и доказательства</h2>
+
+        {% if inv.evidence_items %}
+        <div class="grid sm:grid-cols-2 gap-3 mb-5">
+          {% for ev in inv.evidence_items %}
+          <div class="bg-obsidian-panel2 border border-obsidian-border rounded-lg p-3">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs px-2 py-0.5 rounded bg-obsidian-bg border border-obsidian-border text-obsidian-muted">{{ ev.type_label }}</span>
+            </div>
+            <div class="font-medium text-white text-sm mb-1">{{ ev.title }}</div>
+            {% if ev.evidence_type == 'image' and ev.content %}
+              <img src="{{ ev.content }}" alt="{{ ev.title }}" class="rounded-md border border-obsidian-border mb-2 max-h-48 object-cover w-full">
+            {% elif ev.evidence_type == 'link' and ev.content %}
+              <a href="{{ ev.content }}" target="_blank" rel="noopener noreferrer" class="text-obsidian-accent2 text-sm underline break-all">{{ ev.content }}</a>
+            {% elif ev.content %}
+              <p class="text-sm text-obsidian-muted whitespace-pre-line">{{ ev.content }}</p>
+            {% endif %}
+            {% if ev.description %}
+            <p class="text-xs text-obsidian-muted mt-1">{{ ev.description }}</p>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-sm text-obsidian-muted mb-5">Улик пока не прикреплено.</p>
+        {% endif %}
+
+        <details class="bg-obsidian-panel2 border border-obsidian-border rounded-lg p-3">
+          <summary class="cursor-pointer text-sm text-obsidian-accent2">+ Прикрепить улику</summary>
+          <form method="post" action="/investigation/{{ inv.id }}/evidence" class="mt-3 space-y-2">
+            <input name="title" required placeholder="Название улики"
+              class="w-full bg-obsidian-bg border border-obsidian-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-obsidian-accent">
+            <select name="evidence_type" class="w-full bg-obsidian-bg border border-obsidian-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-obsidian-accent">
+              {% for key, label in evidence_types.items() %}
+              <option value="{{ key }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+            <input name="content" placeholder="URL (для ссылки/изображения) или текст заметки"
+              class="w-full bg-obsidian-bg border border-obsidian-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-obsidian-accent">
+            <textarea name="description" placeholder="Короткий комментарий к улике (необязательно)" rows="2"
+              class="w-full bg-obsidian-bg border border-obsidian-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-obsidian-accent"></textarea>
+            <button type="submit" class="px-4 py-1.5 rounded-md text-sm font-medium bg-obsidian-accent hover:bg-obsidian-accent2 text-white transition">
+              Добавить улику
+            </button>
+          </form>
+        </details>
+      </section>
+
+      <!-- COMMENTS -->
+      <section id="comments" class="bg-obsidian-panel border border-obsidian-border rounded-xl p-5">
+        <h2 class="text-lg font-semibold text-white mb-4">💬 Обсуждение ({{ inv.comments|length }})</h2>
+
+        <div class="space-y-3 mb-5">
+          {% for c in inv.comments %}
+          <div class="bg-obsidian-panel2 border border-obsidian-border rounded-lg p-3">
+            <div class="flex items-center justify-between mb-1">
+              <span class="font-medium text-sm text-obsidian-accent2">{{ c.author }}</span>
+              <span class="text-xs text-obsidian-muted">{{ c.created_at.strftime('%d.%m.%Y %H:%M') }}</span>
+            </div>
+            <p class="text-sm whitespace-pre-line">{{ c.content }}</p>
+          </div>
+          {% else %}
+          <p class="text-sm text-obsidian-muted">Комментариев пока нет — будьте первым.</p>
+          {% endfor %}
+        </div>
+
+        <form method="post" action="/investigation/{{ inv.id }}/comments" class="space-y-2">
+          <input name="author" placeholder="Ваше имя (необязательно)"
+            class="w-full bg-obsidian-panel2 border border-obsidian-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-obsidian-accent">
+          <textarea name="content" required rows="3" placeholder="Ваш комментарий..."
+            class="w-full bg-obsidian-panel2 border border-obsidian-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-obsidian-accent"></textarea>
+          <button type="submit" class="px-4 py-1.5 rounded-md text-sm font-medium bg-obsidian-accent hover:bg-obsidian-accent2 text-white transition">
+            Отправить комментарий
+          </button>
+        </form>
+      </section>
+    </div>
+
+    <!-- RIGHT / GRAPH SIDEBAR -->
+    <div class="lg:col-span-1">
+      <div class="bg-obsidian-panel border border-obsidian-border rounded-xl p-4 sticky top-20">
+        <h2 class="text-sm font-semibold text-white mb-3">🕸️ Граф связей дела</h2>
+        <div id="local-network" class="w-full rounded-lg border border-obsidian-border" style="height: 60vh;"></div>
+        <div class="flex flex-wrap gap-2 mt-3 text-[11px] text-obsidian-muted">
+          <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full inline-block" style="background:#8875ff"></span> Дело</span>
+          {% for key, meta in node_types.items() %}
+          <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full inline-block" style="background:{{ meta.color }}"></span> {{ meta.label }}</span>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="border-t border-obsidian-border py-4 text-center text-xs text-obsidian-muted">
+    {{ app_name }} — форум расследований с графом связей в стиле Obsidian. Автор: {{ app_author }}.
+  </footer>
+
+<script>
+  async function loadLocalGraph() {
+    const res = await fetch('/api/investigation/{{ inv.id }}/graph');
+    const data = await res.json();
+    const nodes = new vis.DataSet(data.nodes);
+    const edges = new vis.DataSet(data.edges);
+    const container = document.getElementById('local-network');
+    const options = {
+      autoResize: true,
+      nodes: { shape: 'dot', size: 16, font: { color: '#dcddde', size: 13 }, borderWidth: 2 },
+      edges: {
+        color: { color: '#4b5563', highlight: '#8875ff' },
+        font: { color: '#9a9a9a', size: 9, strokeWidth: 0, background: '#1e1e1e' },
+        smooth: { type: 'continuous' },
+        arrows: { to: { enabled: true, scaleFactor: 0.5 } },
+      },
+      physics: { stabilization: true, barnesHut: { gravitationalConstant: -5000, springLength: 110 } },
+      interaction: { hover: true, tooltipDelay: 100 },
+    };
+    new vis.Network(container, { nodes, edges }, options);
+  }
+  window.addEventListener('DOMContentLoaded', loadLocalGraph);
+</script>
+</body>
+</html>
