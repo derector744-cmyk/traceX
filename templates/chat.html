@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ partner.username }} — Сообщения — {{ app_name }}</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: { extend: { colors: {
+      obsidian: { bg:'#1e1e1e', panel:'#262626', panel2:'#2d2d2d', border:'#3a3a3a', accent:'#8875ff', accent2:'#a78bfa', text:'#dcddde', muted:'#9a9a9a' }
+    }}}
+  }
+</script>
+<style>
+  body { background-color: #1e1e1e; }
+  textarea:focus { outline: none; border-color: #8875ff; }
+  .bubble-mine { background: #8875ff; color: #fff; border-bottom-right-radius: 3px; }
+  .bubble-theirs { background: #2d2d2d; border: 1px solid #3a3a3a; border-bottom-left-radius: 3px; }
+</style>
+{% include "_head_assets.html" %}
+</head>
+<body class="bg-obsidian-bg text-obsidian-text min-h-screen flex flex-col">
+
+  {% include "_nav.html" %}
+
+  <div class="border-b border-obsidian-border bg-obsidian-panel/60 sticky top-[65px] z-20">
+    <div class="max-w-3xl mx-auto px-4 py-3 flex items-center gap-3">
+      <a href="/messages" class="text-obsidian-muted hover:text-white transition text-sm">←</a>
+      <span class="w-8 h-8 rounded-full bg-obsidian-accent/20 border border-obsidian-accent/40 flex items-center justify-center text-xs font-semibold text-obsidian-accent2">
+        {{ partner.username[0]|upper }}
+      </span>
+      <span class="font-semibold text-white flex items-center gap-1">
+        {{ partner.username }}
+        {% if partner.is_owner %}<span title="Владелец сайта">✔️</span>{% endif %}
+        {% if partner.username == support_username %}<span class="text-[10px] text-obsidian-accent2 font-normal">(поддержка)</span>{% endif %}
+      </span>
+    </div>
+  </div>
+
+  <main class="flex-1 max-w-3xl mx-auto w-full px-4 py-6 flex flex-col gap-3">
+    {% for m in thread %}
+      {% if m.sender_id == current_user.id %}
+      <div class="flex justify-end tx-fade-up">
+        <div class="bubble-mine max-w-[75%] rounded-2xl px-4 py-2 text-sm">
+          <p class="whitespace-pre-line">{{ m.content }}</p>
+          <div class="text-[10px] opacity-70 mt-1 text-right">{{ m.created_at.strftime('%d.%m.%Y %H:%M') }}</div>
+        </div>
+      </div>
+      {% else %}
+      <div class="flex justify-start tx-fade-up">
+        <div class="bubble-theirs max-w-[75%] rounded-2xl px-4 py-2 text-sm">
+          <p class="whitespace-pre-line">{{ m.content }}</p>
+          <div class="text-[10px] text-obsidian-muted mt-1">{{ m.created_at.strftime('%d.%m.%Y %H:%M') }}</div>
+        </div>
+      </div>
+      {% endif %}
+    {% else %}
+    <div class="text-center text-obsidian-muted py-16">
+      Пока нет сообщений с {{ partner.username }}. Напишите первым.
+    </div>
+    {% endfor %}
+  </main>
+
+  <div class="border-t border-obsidian-border bg-obsidian-panel/80 sticky bottom-0">
+    <form method="post" action="/messages/{{ partner.username }}" class="max-w-3xl mx-auto px-4 py-3 flex items-end gap-2">
+      <textarea name="content" required rows="1" placeholder="Написать сообщение..." autofocus
+        class="flex-1 resize-none bg-obsidian-panel2 border border-obsidian-border rounded-md px-3 py-2 text-sm">{{ prefill }}</textarea>
+      <button type="submit" class="tx-btn px-4 py-2 rounded-md text-sm font-semibold bg-obsidian-accent hover:bg-obsidian-accent2 text-white transition">
+        Отправить
+      </button>
+    </form>
+  </div>
+
+<script>
+  // автоскролл к последнему сообщению
+  window.addEventListener('DOMContentLoaded', () => {
+    window.scrollTo(0, document.body.scrollHeight);
+    const ta = document.querySelector('textarea[name="content"]');
+    if (ta) {
+      ta.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          ta.closest('form').submit();
+        }
+      });
+    }
+  });
+</script>
+{% include "_footer_assets.html" %}
+</body>
+</html>

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Поиск: {{ q }} — {{ app_name }}</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: { extend: { colors: {
+      obsidian: { bg:'#1e1e1e', panel:'#262626', panel2:'#2d2d2d', border:'#3a3a3a', accent:'#8875ff', accent2:'#a78bfa', text:'#dcddde', muted:'#9a9a9a' }
+    }}}
+  }
+</script>
+<style> body { background-color: #1e1e1e; } </style>
+{% include "_head_assets.html" %}
+</head>
+<body class="bg-obsidian-bg text-obsidian-text min-h-screen flex flex-col">
+
+  {% include "_nav.html" %}
+
+  <main class="flex-1 max-w-4xl mx-auto w-full px-4 py-8 space-y-8">
+    <h1 class="text-xl font-bold text-white tx-fade-up">🔍 Результаты поиска{% if q %}: «{{ q }}»{% endif %}</h1>
+
+    {% if not q or q|length < 2 %}
+    <p class="text-obsidian-muted">Введите минимум 2 символа в строку поиска в шапке сайта.</p>
+    {% elif not inv_results and not node_results and not evidence_results and not comment_results %}
+    <p class="text-obsidian-muted">Ничего не найдено. Попробуйте другой запрос.</p>
+    {% else %}
+
+    {% if inv_results %}
+    <section class="tx-fade-up">
+      <h2 class="text-sm font-semibold text-obsidian-muted uppercase tracking-wide mb-2">📁 Расследования</h2>
+      <div class="space-y-2">
+        {% for inv in inv_results %}
+        <a href="/investigation/{{ inv.id }}" class="tx-card block bg-obsidian-panel border border-obsidian-border rounded-xl p-3">
+          <div class="font-medium text-white">{{ inv.title }}</div>
+          <p class="text-sm text-obsidian-muted line-clamp-1">{{ inv.description }}</p>
+        </a>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    {% if node_results %}
+    <section class="tx-fade-up" style="--tx-delay:1">
+      <h2 class="text-sm font-semibold text-obsidian-muted uppercase tracking-wide mb-2">🕸️ Объекты графа</h2>
+      <div class="space-y-2">
+        {% for n in node_results %}
+        <a href="/investigation/{{ n.investigation_id }}" class="tx-card block bg-obsidian-panel border border-obsidian-border rounded-xl p-3">
+          <span class="font-medium text-white">{{ n.label }}</span>
+          <span class="text-xs text-obsidian-muted ml-2">{{ n.type_label }} · в деле «{{ n.investigation.title }}»</span>
+        </a>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    {% if evidence_results %}
+    <section class="tx-fade-up" style="--tx-delay:2">
+      <h2 class="text-sm font-semibold text-obsidian-muted uppercase tracking-wide mb-2">📎 Улики</h2>
+      <div class="space-y-2">
+        {% for ev in evidence_results %}
+        <a href="/investigation/{{ ev.investigation_id }}#evidence" class="tx-card block bg-obsidian-panel border border-obsidian-border rounded-xl p-3">
+          <span class="font-medium text-white">{{ ev.title }}</span>
+          <span class="text-xs text-obsidian-muted ml-2">в деле «{{ ev.investigation.title }}»</span>
+        </a>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    {% if comment_results %}
+    <section class="tx-fade-up" style="--tx-delay:3">
+      <h2 class="text-sm font-semibold text-obsidian-muted uppercase tracking-wide mb-2">💬 Комментарии</h2>
+      <div class="space-y-2">
+        {% for c in comment_results %}
+        <a href="/investigation/{{ c.investigation_id }}#comments" class="tx-card block bg-obsidian-panel border border-obsidian-border rounded-xl p-3">
+          <p class="text-sm text-obsidian-text line-clamp-2">{{ c.content }}</p>
+          <span class="text-xs text-obsidian-muted">{{ c.author }} · в деле «{{ c.investigation.title }}»</span>
+        </a>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    {% endif %}
+  </main>
+
+  <footer class="border-t border-obsidian-border py-4 text-center text-xs text-obsidian-muted">
+    {{ app_name }} — платформа расследований с графом связей. Автор: {{ app_author }}.
+  </footer>
+{% include "_footer_assets.html" %}
+</body>
+</html>

@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Визуализатор графа связей — {{ app_name }}</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+<script>
+  tailwind.config = {
+    theme: { extend: { colors: {
+      obsidian: { bg:'#1e1e1e', panel:'#262626', panel2:'#2d2d2d', border:'#3a3a3a', accent:'#8875ff', accent2:'#a78bfa', text:'#dcddde', muted:'#9a9a9a' }
+    }}}
+  }
+</script>
+<style>
+  body { background-color: #1e1e1e; }
+  #canvas-wrap { position: relative; overflow: hidden; border-radius: 14px; }
+  #canvas { background-color: #14141a; background-image: radial-gradient(#2a2a35 1px, transparent 1px); background-size: 24px 24px; position: relative; z-index: 1; }
+  .viz-blob {
+    position: absolute; border-radius: 9999px; filter: blur(80px); opacity: .35; pointer-events: none; z-index: 0;
+    animation: floatSlow 7s ease-in-out infinite;
+  }
+  .tool-btn { transition: all .15s ease; }
+  .tool-btn.active { background-color: #8875ff !important; color: #fff !important; border-color: #8875ff !important; box-shadow: 0 0 16px 2px rgba(136,117,255,.55); }
+  select, input { background-color: #2d2d2d; border: 1px solid #3a3a3a; color: #dcddde; border-radius: 6px; padding: 6px 10px; font-size: 13px; }
+  .vis-tooltip {
+    background-color: #262626 !important; color: #dcddde !important;
+    border: 1px solid #8875ff !important; border-radius: 8px !important;
+    box-shadow: 0 0 14px rgba(136,117,255,.4) !important;
+  }
+</style>
+{% include "_head_assets.html" %}
+</head>
+<body class="bg-obsidian-bg text-obsidian-text min-h-screen flex flex-col">
+
+  {% include "_nav.html" %}
+
+  <div class="border-b border-obsidian-border bg-obsidian-panel/60">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center gap-2">
+      <button id="mode-move" onclick="setMode('move')" class="tool-btn active px-3 py-1.5 rounded-md text-sm border border-obsidian-border bg-obsidian-panel2">🖐️ Двигать</button>
+      <button id="mode-node" onclick="setMode('node')" class="tool-btn px-3 py-1.5 rounded-md text-sm border border-obsidian-border bg-obsidian-panel2">⚫ Точка</button>
+      <button id="mode-edge" onclick="setMode('edge')" class="tool-btn px-3 py-1.5 rounded-md text-sm border border-obsidian-border bg-obsidian-panel2">↗️ Стрелка</button>
+      <button id="mode-delete" onclick="setMode('delete')" class="tool-btn px-3 py-1.5 rounded-md text-sm border border-obsidian-border bg-obsidian-panel2">🗑️ Удалить</button>
+
+      <select id="new-node-type" class="ml-1">
+        {% for key, meta in node_types.items() %}
+        <option value="{{ key }}">{{ meta.label }}</option>
+        {% endfor %}
+      </select>
+
+      <span class="w-px h-6 bg-obsidian-border mx-1 hidden sm:inline-block"></span>
+
+      <button onclick="clearGraph()" class="px-3 py-1.5 rounded-md text-sm border border-obsidian-border hover:border-red-500 hover:text-red-400 transition">Очистить</button>
+      <button onclick="exportPng()" class="px-3 py-1.5 rounded-md text-sm border border-obsidian-border hover:border-obsidian-accent transition">🖼️ PNG</button>
+      <button onclick="exportJson()" class="px-3 py-1.5 rounded-md text-sm border border-obsidian-border hover:border-obsidian-accent transition">⬇️ JSON</button>
+      <label class="px-3 py-1.5 rounded-md text-sm border border-obsidian-border hover:border-obsidian-accent transition cursor-pointer">
+        ⬆️ Импорт
+        <input type="file" accept=".json" class="hidden" onchange="importJson(event)">
+      </label>
+
+      {% if current_user %}
+      <button onclick="sendToInvestigation()" class="ml-auto tx-btn px-4 py-1.5 rounded-md text-sm font-semibold bg-obsidian-accent hover:bg-obsidian-accent2 text-white transition">
+        + Сделать из этого расследование
+      </button>
+      {% else %}
+      <a href="/login?next=/visualizer" class="ml-auto px-4 py-1.5 rounded-md text-sm font-semibold border border-obsidian-accent text-obsidian-accent2 hover:bg-obsidian-accent hover:text-white transition">
+        Войдите, чтобы сохранить как дело
+      </a>
+      {% endif %}
+    </div>
+  </div>
+
+  <main class="flex-1 max-w-7xl mx-auto w-full px-4 py-4">
+    <p id="hint" class="text-xs text-obsidian-muted mb-2">Режим «Двигать»: перетаскивайте узлы и вращайте холст колёсиком.</p>
+    <div id="canvas-wrap" class="w-full border border-obsidian-border" style="height: 74vh;">
+      <div class="viz-blob w-80 h-80 bg-obsidian-accent -top-16 -left-16"></div>
+      <div class="viz-blob w-72 h-72 bg-purple-500 bottom-0 right-0" style="animation-delay:-3s;"></div>
+      <div id="canvas" class="w-full h-full"></div>
+    </div>
+  </main>
+
+  <footer class="border-t border-obsidian-border py-4 text-center text-xs text-obsidian-muted">
+    Свободный визуализатор точек и связей — рисуйте свою схему, не привязываясь к готовому делу.
+  </footer>
+
+<script>
+  const NODE_TYPES = {{ node_types | tojson }};
+  const nodes = new vis.DataSet([]);
+  const edges = new vis.DataSet([]);
+  let nodeSeq = 1;
+  let edgeSeq = 1;
+  let mode = 'move';
+  let edgeSourceId = null;
+
+  const container = document.getElementById('canvas');
+  const options = {
+    autoResize: true,
+    physics: { enabled: false },
+    nodes: {
+      shape: 'dot', size: 18, font: { color: '#dcddde', size: 14 }, borderWidth: 2,
+      shadow: { enabled: true, color: 'rgba(136,117,255,0.85)', size: 18, x: 0, y: 0 },
+    },
+    edges: {
+      color: { color: '#8875ff', highlight: '#c4b5fd' },
+      font: { color: '#c4b5fd', size: 11, strokeWidth: 0, background: '#1e1e1e' },
+      smooth: { type: 'continuous' },
+      arrows: { to: { enabled: true, scaleFactor: 0.55 } },
+      width: 2,
+      shadow: { enabled: true, color: 'rgba(136,117,255,0.5)', size: 10 },
+    },
+    interaction: { hover: true, multiselect: true },
+    manipulation: { enabled: false },
+  };
+  const network = new vis.Network(container, { nodes, edges }, options);
+
+  const HINTS = {
+    move: 'Режим «Двигать»: перетаскивайте узлы и вращайте холст колёсиком.',
+    node: 'Режим «Точка»: кликните по пустому месту холста, чтобы поставить новый узел.',
+    edge: 'Режим «Стрелка»: кликните на узел-источник, затем на узел-цель, чтобы провести стрелку.',
+    delete: 'Режим «Удалить»: кликните по узлу или стрелке, чтобы удалить её.',
+  };
+
+  function setMode(newMode) {
+    mode = newMode;
+    edgeSourceId = null;
+    ['move', 'node', 'edge', 'delete'].forEach(m => {
+      document.getElementById('mode-' + m).classList.toggle('active', m === newMode);
+    });
+    document.getElementById('hint').textContent = HINTS[newMode];
+    network.setOptions({ interaction: { dragView: true, dragNodes: newMode === 'move' } });
+  }
+
+  function colorForType(type) {
+    return (NODE_TYPES[type] && NODE_TYPES[type].color) || '#a78bfa';
+  }
+
+  network.on('click', function (params) {
+    if (mode === 'node') {
+      if (params.nodes.length > 0) return; // клик по существующему узлу — игнор
+      const label = prompt('Название узла (фигурант, организация, тема...):');
+      if (!label || !label.trim()) return;
+      const type = document.getElementById('new-node-type').value;
+      const id = 'n' + (nodeSeq++);
+      nodes.add({
+        id, label: label.trim(), group: type, color: colorForType(type),
+        x: params.pointer.canvas.x, y: params.pointer.canvas.y,
+        title: label.trim(),
+      });
+    } else if (mode === 'edge') {
+      if (params.nodes.length === 0) { edgeSourceId = null; return; }
+      const clickedId = params.nodes[0];
+      if (!edgeSourceId) {
+        edgeSourceId = clickedId;
+      } else {
+        const label = prompt('Тип связи (например: причастен к, работает в, финансирует):', 'связан с') || 'связан с';
+        edges.add({ id: 'e' + (edgeSeq++), from: edgeSourceId, to: clickedId, label: label.trim() || 'связан с' });
+        edgeSourceId = null;
+      }
+    } else if (mode === 'delete') {
+      if (params.nodes.length > 0) {
+        nodes.remove(params.nodes[0]);
+        const toRemove = edges.get({ filter: e => e.from === params.nodes[0] || e.to === params.nodes[0] }).map(e => e.id);
+        edges.remove(toRemove);
+      } else if (params.edges.length > 0) {
+        edges.remove(params.edges[0]);
+      }
+    }
+  });
+
+  network.on('doubleClick', function (params) {
+    if (params.nodes.length > 0) {
+      const n = nodes.get(params.nodes[0]);
+      const newLabel = prompt('Новое название узла:', n.label);
+      if (newLabel && newLabel.trim()) nodes.update({ id: n.id, label: newLabel.trim(), title: newLabel.trim() });
+    } else if (params.edges.length > 0) {
+      const e = edges.get(params.edges[0]);
+      const newLabel = prompt('Новый текст связи:', e.label);
+      if (newLabel !== null) edges.update({ id: e.id, label: newLabel.trim() });
+    }
+  });
+
+  function clearGraph() {
+    if (nodes.length === 0 && edges.length === 0) return;
+    if (!confirm('Очистить весь холст?')) return;
+    nodes.clear();
+    edges.clear();
+  }
+
+  function exportPng() {
+    const canvasEl = container.getElementsByTagName('canvas')[0];
+    if (!canvasEl) return;
+    const link = document.createElement('a');
+    link.download = 'graph.png';
+    link.href = canvasEl.toDataURL('image/png');
+    link.click();
+  }
+
+  function exportJson() {
+    const data = { nodes: nodes.get(), edges: edges.get() };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const link = document.createElement('a');
+    link.download = 'graph.json';
+    link.href = URL.createObjectURL(blob);
+    link.click();
+  }
+
+  function importJson(evt) {
+    const file = evt.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        nodes.clear(); edges.clear();
+        (data.nodes || []).forEach(n => nodes.add(n));
+        (data.edges || []).forEach(e => edges.add(e));
+      } catch (e) {
+        alert('Не удалось прочитать файл: ' + e.message);
+      }
+    };
+    reader.readAsText(file);
+    evt.target.value = '';
+  }
+
+  function sendToInvestigation() {
+    if (nodes.length === 0) {
+      alert('Сначала добавьте хотя бы один узел.');
+      return;
+    }
+    const payload = { nodes: nodes.get(), edges: edges.get() };
+    sessionStorage.setItem('tx-visualizer-graph', JSON.stringify(payload));
+    window.location.href = '/create?from_visualizer=1';
+  }
+
+  window.addEventListener('DOMContentLoaded', () => setMode('move'));
+</script>
+{% include "_footer_assets.html" %}
+</body>
+</html>
