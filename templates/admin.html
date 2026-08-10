@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Админ-панель — {{ app_name }}</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: { extend: { colors: {
+      obsidian: { bg:'#1e1e1e', panel:'#262626', panel2:'#2d2d2d', border:'#3a3a3a', accent:'#8875ff', accent2:'#a78bfa', text:'#dcddde', muted:'#9a9a9a' }
+    }}}
+  }
+</script>
+<style>
+  body { background-color: #1e1e1e; }
+  table { border-collapse: collapse; }
+  th { text-align: left; }
+</style>
+{% include "_head_assets.html" %}
+</head>
+<body class="bg-obsidian-bg text-obsidian-text min-h-screen flex flex-col">
+
+  {% include "_nav.html" %}
+
+  <main class="flex-1 max-w-7xl mx-auto w-full px-4 py-8 space-y-8">
+
+    <div class="tx-fade-up flex items-center gap-3 flex-wrap">
+      <h1 class="text-2xl font-bold text-white flex items-center gap-2">🛡️ Админ-панель</h1>
+      <span class="tx-badge-pulse text-[10px] px-2 py-0.5 rounded-full border border-obsidian-accent text-obsidian-accent2">
+        {{ current_user.username }}
+      </span>
+      <a href="/admin/backup" class="ml-auto tx-btn text-xs px-3 py-1.5 rounded-md border border-obsidian-border hover:border-obsidian-accent transition">
+        💾 Скачать бэкап БД (JSON)
+      </a>
+    </div>
+
+    <!-- STATS -->
+    <section data-tx-stagger class="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div class="tx-card bg-obsidian-panel border border-obsidian-border rounded-xl p-4 text-center">
+        <div class="text-2xl font-bold text-obsidian-accent2">{{ stats.investigations }}</div>
+        <div class="text-xs text-obsidian-muted mt-1">Расследований</div>
+      </div>
+      <div class="tx-card bg-obsidian-panel border border-obsidian-border rounded-xl p-4 text-center">
+        <div class="text-2xl font-bold text-obsidian-accent2">{{ stats.users }}</div>
+        <div class="text-xs text-obsidian-muted mt-1">Пользователей</div>
+      </div>
+      <div class="tx-card bg-obsidian-panel border border-obsidian-border rounded-xl p-4 text-center">
+        <div class="text-2xl font-bold text-obsidian-accent2">{{ stats.comments }}</div>
+        <div class="text-xs text-obsidian-muted mt-1">Комментариев</div>
+      </div>
+      <div class="tx-card bg-obsidian-panel border border-obsidian-border rounded-xl p-4 text-center">
+        <div class="text-2xl font-bold text-obsidian-accent2">{{ stats.evidence }}</div>
+        <div class="text-xs text-obsidian-muted mt-1">Улик</div>
+      </div>
+      <div class="tx-card bg-obsidian-panel border border-obsidian-border rounded-xl p-4 text-center">
+        <div class="text-2xl font-bold text-obsidian-accent2">{{ stats.admins }}</div>
+        <div class="text-xs text-obsidian-muted mt-1">Администраторов</div>
+      </div>
+    </section>
+
+    <!-- INVESTIGATIONS MODERATION -->
+    <section class="tx-fade-up" style="--tx-delay:1">
+      <h2 class="text-lg font-semibold text-white mb-3">📁 Модерация расследований</h2>
+      <div class="bg-obsidian-panel border border-obsidian-border rounded-xl overflow-hidden">
+        <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-obsidian-panel2 text-obsidian-muted text-xs uppercase tracking-wide">
+            <tr>
+              <th class="px-4 py-2.5">Название</th>
+              <th class="px-4 py-2.5">Автор</th>
+              <th class="px-4 py-2.5">Статус</th>
+              <th class="px-4 py-2.5">Категория</th>
+              <th class="px-4 py-2.5">Дата</th>
+              <th class="px-4 py-2.5 text-right">Действия</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for inv in investigations %}
+            <tr class="border-t border-obsidian-border hover:bg-obsidian-panel2/50 transition">
+              <td class="px-4 py-2.5">
+                <a href="/investigation/{{ inv.id }}" class="text-white hover:text-obsidian-accent2 tx-link-underline font-medium">{{ inv.title }}</a>
+              </td>
+              <td class="px-4 py-2.5 text-obsidian-muted">{{ inv.author }}</td>
+              <td class="px-4 py-2.5">
+                <span class="text-[11px] px-2 py-0.5 rounded-full border
+                  {% if inv.status == 'completed' %} border-green-600 text-green-400
+                  {% elif inv.status == 'factcheck' %} border-yellow-600 text-yellow-400
+                  {% else %} border-blue-600 text-blue-400 {% endif %}">
+                  {{ inv.status_label }}
+                </span>
+              </td>
+              <td class="px-4 py-2.5 text-obsidian-muted">{{ inv.category }}</td>
+              <td class="px-4 py-2.5 text-obsidian-muted whitespace-nowrap">{{ inv.created_at.strftime('%d.%m.%Y') }}</td>
+              <td class="px-4 py-2.5 text-right">
+                <form method="post" action="/investigation/{{ inv.id }}/delete" data-confirm="Удалить расследование «{{ inv.title }}»? Действие необратимо.">
+                  <button type="submit" class="tx-btn text-xs px-2.5 py-1 rounded-md border border-red-800 text-red-400 hover:bg-red-950 hover:border-red-500 transition">
+                    🗑️ Удалить
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" class="px-4 py-8 text-center text-obsidian-muted">Расследований пока нет.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- USER MANAGEMENT -->
+    <section class="tx-fade-up pb-10" style="--tx-delay:2">
+      <h2 class="text-lg font-semibold text-white mb-3">👥 Пользователи</h2>
+      <div class="bg-obsidian-panel border border-obsidian-border rounded-xl overflow-hidden">
+        <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-obsidian-panel2 text-obsidian-muted text-xs uppercase tracking-wide">
+            <tr>
+              <th class="px-4 py-2.5">Пользователь</th>
+              <th class="px-4 py-2.5">Email</th>
+              <th class="px-4 py-2.5">Роль</th>
+              <th class="px-4 py-2.5">Регистрация</th>
+              <th class="px-4 py-2.5 text-right">Действия</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for u in users %}
+            <tr class="border-t border-obsidian-border hover:bg-obsidian-panel2/50 transition">
+              <td class="px-4 py-2.5 text-white font-medium flex items-center gap-2">
+                <span class="w-6 h-6 rounded-full bg-obsidian-accent/20 border border-obsidian-accent/40 flex items-center justify-center text-[10px] font-semibold text-obsidian-accent2">
+                  {{ u.username[0]|upper }}
+                </span>
+                {{ u.username }}
+                {% if u.id == current_user.id %}<span class="text-[10px] text-obsidian-muted">(вы)</span>{% endif %}
+              </td>
+              <td class="px-4 py-2.5 text-obsidian-muted">{{ u.email or "—" }}</td>
+              <td class="px-4 py-2.5">
+                {% if u.is_admin %}
+                <span class="text-[11px] px-2 py-0.5 rounded-full border border-obsidian-accent text-obsidian-accent2">Админ</span>
+                {% else %}
+                <span class="text-[11px] px-2 py-0.5 rounded-full border border-obsidian-border text-obsidian-muted">Пользователь</span>
+                {% endif %}
+              </td>
+              <td class="px-4 py-2.5 text-obsidian-muted whitespace-nowrap">{{ u.created_at.strftime('%d.%m.%Y') }}</td>
+              <td class="px-4 py-2.5">
+                <div class="flex justify-end gap-2">
+                  <form method="post" action="/admin/user/{{ u.id }}/toggle-admin">
+                    <button type="submit" class="tx-btn text-xs px-2.5 py-1 rounded-md border border-obsidian-border hover:border-obsidian-accent transition">
+                      {% if u.is_admin %}Снять права{% else %}Сделать админом{% endif %}
+                    </button>
+                  </form>
+                  {% if u.id != current_user.id %}
+                  <form method="post" action="/admin/user/{{ u.id }}/delete" data-confirm="Удалить пользователя «{{ u.username }}»? Его расследования сохранятся, но станут «без автора».">
+                    <button type="submit" class="tx-btn text-xs px-2.5 py-1 rounded-md border border-red-800 text-red-400 hover:bg-red-950 hover:border-red-500 transition">
+                      Удалить
+                    </button>
+                  </form>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ADMIN ACTION LOG -->
+    <section class="tx-fade-up pb-10" style="--tx-delay:3">
+      <h2 class="text-lg font-semibold text-white mb-3">📜 Журнал действий администраторов</h2>
+      <div class="bg-obsidian-panel border border-obsidian-border rounded-xl overflow-hidden">
+        <div class="overflow-x-auto max-h-80 overflow-y-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-obsidian-panel2 text-obsidian-muted text-xs uppercase tracking-wide sticky top-0">
+            <tr>
+              <th class="px-4 py-2.5">Кто</th>
+              <th class="px-4 py-2.5">Действие</th>
+              <th class="px-4 py-2.5">Объект</th>
+              <th class="px-4 py-2.5">Когда</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for log in admin_logs %}
+            <tr class="border-t border-obsidian-border">
+              <td class="px-4 py-2 text-white">{{ log.admin.username if log.admin else "—" }}</td>
+              <td class="px-4 py-2 text-obsidian-muted">{{ log.action }}</td>
+              <td class="px-4 py-2 text-obsidian-muted">{{ log.target }}</td>
+              <td class="px-4 py-2 text-obsidian-muted whitespace-nowrap">{{ log.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="px-4 py-6 text-center text-obsidian-muted">Пока нет записей.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="border-t border-obsidian-border py-4 text-center text-xs text-obsidian-muted">
+    {{ app_name }} — форум расследований с графом связей в стиле Obsidian. Автор: {{ app_author }}.
+  </footer>
+{% include "_footer_assets.html" %}
+</body>
+</html>
